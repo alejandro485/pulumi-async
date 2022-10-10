@@ -12,8 +12,8 @@ export = async () => {
     await repository.disconnect();
 
     const exampleFuntion = await gcp.cloudfunctions.getFunction({
-        name: 'function-us-central1',
-        region: 'us-central1'
+        name: `${process.env.FUNCTION_NAME}`,
+        region: `${process.env.FUNCTION_REGION}`,
     });
 
     const permissionsList = [{
