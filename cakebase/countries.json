@@ -1,0 +1,14 @@
+[
+    {
+        "name": "Colombia",
+        "default_timezone": "America/Bogota"
+    },
+    {
+        "name": "Chile",
+        "default_timezone": "America/Santiago"
+    },
+    {
+        "name": "Spain",
+        "default_timezone": "Europe/Madrid"
+    }
+]

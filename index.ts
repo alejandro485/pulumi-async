@@ -1,32 +1,32 @@
 import { config } from 'dotenv';
 config();
 
-import * as pulumi from '@pulumi/pulumi';
+import { RepositoryFactory } from './repository/repository.factory';
 import * as gcp from '@pulumi/gcp';
-import { MongoClient } from 'mongodb';
 
 export = async () => {
     const schedules: gcp.cloudscheduler.Job[] = [];
 
-    const client = new MongoClient(`${process.env.DB_MONGO_CONNECTION}`);
+    const repository = RepositoryFactory.getRepository();
+    await repository.connect();
+    const countries = await repository.getAllCountries();
+    await repository.disconnect();
 
-    await client.connect();
-    const database = client.db('pharol-dev');
-    const configCountry = database.collection('configCountry');
-    const countries = await configCountry.find({
-        status: true,
-    }).toArray();
+    const exampleFuntion = await gcp.cloudfunctions.getFunction({
+        name: 'function-us-central1',
+        region: 'us-central1'
+    })
 
     for(const country of countries) {
-        schedules.push(new gcp.cloudscheduler.Job(`schedule-job/sitemap/${country.code}`, {
-            name: `sitemap-${country.code}`.toLowerCase(),
+        schedules.push(new gcp.cloudscheduler.Job(`schedule-job/sitemap/${country.name}`, {
+            name: `sch-query-${country.name}`.toLowerCase(),
             schedule: '0 10 * * 0',
-            timeZone: country.code_timezone,
-            attemptDeadline: '540s',
+            timeZone: country.default_timezone,
+            attemptDeadline: '10s',
             region: 'us-central1',
             httpTarget: {
                 httpMethod: 'GET',
-                uri: `${process.env.FUNCTION_SITEMAP}/${country.code}`,
+                uri: `${exampleFuntion.httpsTriggerUrl}?country=${country.name}`,
             },
             retryConfig: {
                 retryCount: 1,
@@ -35,8 +35,6 @@ export = async () => {
             },
         }));
     }
-
-    await client.close();
 
     return {
         schedules_sitemap: schedules.map(sch => sch.name),
