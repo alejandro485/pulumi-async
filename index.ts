@@ -5,7 +5,6 @@ import { RepositoryFactory } from './repository/repository.factory';
 import * as gcp from '@pulumi/gcp';
 
 export = async () => {
-    const schedules: gcp.cloudscheduler.Job[] = [];
 
     const repository = RepositoryFactory.getRepository();
     await repository.connect();
@@ -15,14 +14,25 @@ export = async () => {
     const exampleFuntion = await gcp.cloudfunctions.getFunction({
         name: 'function-us-central1',
         region: 'us-central1'
-    })
+    });
 
-    for(const country of countries) {
-        schedules.push(new gcp.cloudscheduler.Job(`schedule-job/sitemap/${country.name}`, {
+    const permissionsList = [{
+        service: 'cloudscheduler.googleapis.com',
+        name: 'cloud-scheduler',
+    }];
+
+    const permissions = permissionsList.map(permission =>
+        new gcp.projects.Service(`api/${permission.name}`, {
+            service: permission.service,
+        })
+    );
+
+    const schedules = countries.map((country) =>
+        new gcp.cloudscheduler.Job(`schedule/job/${country.name}`, {
             name: `sch-query-${country.name}`.toLowerCase(),
             schedule: '0 10 * * 0',
             timeZone: country.default_timezone,
-            attemptDeadline: '10s',
+            attemptDeadline: '15s',
             region: 'us-central1',
             httpTarget: {
                 httpMethod: 'GET',
@@ -33,10 +43,13 @@ export = async () => {
                 minBackoffDuration: '5s',
                 maxBackoffDuration: '30s',
             },
-        }));
-    }
+        }, {
+            dependsOn: [permissions[0]],
+        })
+    );
 
     return {
-        schedules_sitemap: schedules.map(sch => sch.name),
+        schedules: schedules.map(sch => sch.name),
+        permissions: permissions.map(per => per.service),
     };
 };
